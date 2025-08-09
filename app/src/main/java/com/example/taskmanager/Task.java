@@ -1,57 +1,36 @@
-package com.example.taskmanager; // Make sure this matches your package name
+package com.example.taskmanager;
 
-import androidx.room.ColumnInfo;
 import androidx.room.Entity;
 import androidx.room.PrimaryKey;
+import androidx.room.ColumnInfo;
 
-// @Entity annotation marks this class as a Room entity (a table in the database)
-@Entity(tableName = "tasks")
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
+
+@Entity(tableName = "task_table")
 public class Task {
 
-    // @PrimaryKey annotation marks this field as the primary key for the table.
-    // autoGenerate = true means Room will automatically generate unique IDs for new tasks.
     @PrimaryKey(autoGenerate = true)
     private int id;
 
-    // @ColumnInfo allows you to customize column names if they differ from field names.
-    // It's good practice to explicitly define them.
-    @ColumnInfo(name = "title")
+    @ColumnInfo(name = "task_title")
     private String title;
 
-    @ColumnInfo(name = "date")
-    private String date; // Storing as String for simplicity with DatePickerDialog output
-
-    @ColumnInfo(name = "time")
-    private String time; // Storing as String for simplicity with TimePickerDialog output
-
-    @ColumnInfo(name = "name")
-    private String name; // Optional
-
-    @ColumnInfo(name = "description")
-    private String description; // Optional
+    @ColumnInfo(name = "task_description")
+    private String description;
 
     @ColumnInfo(name = "is_completed")
-    private boolean isCompleted; // To track task status
+    private boolean isCompleted;
 
-    // Constructor: Room needs a constructor to recreate objects from the database.
-    // It's good practice to have one that includes all fields except the auto-generated primary key.
-    public Task(String title, String date, String time, String name, String description, boolean isCompleted) {
-        this.title = title;
-        this.date = date;
-        this.time = time;
-        this.name = name;
-        this.description = description;
-        this.isCompleted = isCompleted;
-    }
+    @ColumnInfo(name = "task_date_time")
+    private Date dateTime;
 
-    // --- Getters and Setters ---
-    // Room uses these to read and write data to/from the database.
-
+    // Getters and setters
     public int getId() {
         return id;
     }
 
-    // Setter for ID is needed by Room, even if it's auto-generated.
     public void setId(int id) {
         this.id = id;
     }
@@ -62,30 +41,6 @@ public class Task {
 
     public void setTitle(String title) {
         this.title = title;
-    }
-
-    public String getDate() {
-        return date;
-    }
-
-    public void setDate(String date) {
-        this.date = date;
-    }
-
-    public String getTime() {
-        return time;
-    }
-
-    public void setTime(String time) {
-        this.time = time;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
     }
 
     public String getDescription() {
@@ -102,5 +57,30 @@ public class Task {
 
     public void setCompleted(boolean completed) {
         isCompleted = completed;
+    }
+
+    public Date getDateTime() {
+        return dateTime;
+    }
+
+    public void setDateTime(Date dateTime) {
+        this.dateTime = dateTime;
+    }
+
+    // --- New helper methods for formatting date and time ---
+    public String getFormattedDate() {
+        if (dateTime != null) {
+            SimpleDateFormat dateFormat = new SimpleDateFormat("MM/dd/yyyy", Locale.getDefault());
+            return dateFormat.format(dateTime);
+        }
+        return "N/A";
+    }
+
+    public String getFormattedTime() {
+        if (dateTime != null) {
+            SimpleDateFormat timeFormat = new SimpleDateFormat("hh:mm a", Locale.getDefault());
+            return timeFormat.format(dateTime);
+        }
+        return "N/A";
     }
 }
