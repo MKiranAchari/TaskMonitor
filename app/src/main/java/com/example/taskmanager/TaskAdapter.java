@@ -1,12 +1,10 @@
-package com.example.taskmanager; // Make sure this matches your package name
+package com.example.taskmanager;
 
-import android.graphics.Paint;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.CheckBox;
 import android.widget.TextView;
-
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -15,107 +13,82 @@ import java.util.List;
 public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.TaskViewHolder> {
 
     private List<Task> taskList;
-    private OnTaskActionListener listener; // Listener for checkbox and other actions
+    private OnTaskActionListener listener;
+    private boolean isHistoryView;
 
-    // Interface to communicate actions back to the Activity/Fragment
     public interface OnTaskActionListener {
         void onTaskCompleteChanged(Task task, boolean isChecked);
-        // Add other action methods here if needed, e.g., void onTaskClicked(Task task);
     }
 
+    // Main constructor for the home screen
     public TaskAdapter(List<Task> taskList, OnTaskActionListener listener) {
         this.taskList = taskList;
         this.listener = listener;
+        this.isHistoryView = false;
     }
 
-    // This method is called when RecyclerView needs a new ViewHolder of the given type.
-    // It inflates the item layout (task_item.xml) and returns a new TaskViewHolder.
+    // New constructor for the history screen
+    public TaskAdapter(List<Task> taskList, OnTaskActionListener listener, boolean isHistoryView) {
+        this.taskList = taskList;
+        this.listener = listener;
+        this.isHistoryView = isHistoryView;
+    }
+
     @NonNull
     @Override
     public TaskViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        View itemView = LayoutInflater.from(parent.getContext())
-                .inflate(R.layout.task_item, parent, false);
-        return new TaskViewHolder(itemView);
+        View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.task_item, parent, false);
+        return new TaskViewHolder(view);
     }
 
-    // This method is called by RecyclerView to display the data at the specified position.
-    // It updates the contents of the ViewHolder to reflect the item at the given position.
     @Override
     public void onBindViewHolder(@NonNull TaskViewHolder holder, int position) {
         Task currentTask = taskList.get(position);
+        holder.titleTextView.setText(currentTask.getTitle());
+        holder.dateTextView.setText(currentTask.getFormattedDate());
+        holder.timeTextView.setText(currentTask.getFormattedTime());
 
-        holder.textViewTitle.setText(currentTask.getTitle());
-        String dateTime = currentTask.getDate() + " " + currentTask.getTime();
-        holder.textViewDateTime.setText(dateTime);
-
-        // Set optional name visibility and text
-        if (currentTask.getName() != null && !currentTask.getName().isEmpty()) {
-            holder.textViewName.setText("Name: " + currentTask.getName());
-            holder.textViewName.setVisibility(View.VISIBLE);
+        if (isHistoryView) {
+            holder.checkBox.setVisibility(View.GONE);
         } else {
-            holder.textViewName.setVisibility(View.GONE);
-        }
-
-        // Set checkbox state based on task completion status
-        holder.checkBoxComplete.setChecked(currentTask.isCompleted());
-
-        // Apply strikethrough if task is completed
-        applyStrikethrough(holder.textViewTitle, currentTask.isCompleted());
-        applyStrikethrough(holder.textViewDateTime, currentTask.isCompleted());
-        applyStrikethrough(holder.textViewName, currentTask.isCompleted());
-
-        // Set listener for checkbox
-        holder.checkBoxComplete.setOnCheckedChangeListener(null); // Clear previous listener to prevent issues
-        holder.checkBoxComplete.setChecked(currentTask.isCompleted());
-        holder.checkBoxComplete.setOnCheckedChangeListener((buttonView, isChecked) -> {
-            // Update the task's completion status
-            currentTask.setCompleted(isChecked);
-            // Notify the listener (MainActivity) about the change
-            if (listener != null) {
-                listener.onTaskCompleteChanged(currentTask, isChecked);
-            }
-            // Apply strikethrough immediately
-            applyStrikethrough(holder.textViewTitle, isChecked);
-            applyStrikethrough(holder.textViewDateTime, isChecked);
-            applyStrikethrough(holder.textViewName, isChecked);
-        });
-    }
-
-    // Helper method to apply or remove strikethrough
-    private void applyStrikethrough(TextView textView, boolean apply) {
-        if (apply) {
-            textView.setPaintFlags(textView.getPaintFlags() | Paint.STRIKE_THRU_TEXT_FLAG);
-        } else {
-            textView.setPaintFlags(textView.getPaintFlags() & (~Paint.STRIKE_THRU_TEXT_FLAG));
+            holder.checkBox.setVisibility(View.VISIBLE);
+            // This is the key fix. We temporarily remove the listener
+            // before setting the checked state to prevent an infinite loop
+            // or an unwanted trigger during view recycling.
+            holder.checkBox.setOnCheckedChangeListener(null);
+            holder.checkBox.setChecked(currentTask.isCompleted());
+            // Then, we re-attach the listener to correctly handle user clicks.
+            holder.checkBox.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                if (listener != null) {
+                    listener.onTaskCompleteChanged(currentTask, isChecked);
+                }
+            });
         }
     }
 
-    // Returns the total number of items in the data set held by the adapter.
     @Override
     public int getItemCount() {
         return taskList.size();
     }
 
-    // Method to update the adapter's data set and notify RecyclerView
-    public void setTasks(List<Task> newTasks) {
-        this.taskList = newTasks;
-        notifyDataSetChanged(); // Notifies the adapter that the data has changed
+    public void setTasks(List<Task> tasks) {
+        this.taskList.clear();
+        this.taskList.addAll(tasks);
+        notifyDataSetChanged();
     }
 
-    // ViewHolder class: Holds references to the views for each item in the RecyclerView.
-    // This helps in recycling views efficiently.
-    public static class TaskViewHolder extends RecyclerView.ViewHolder {
-        public TextView textViewTitle;
-        public TextView textViewDateTime;
-        public TextView textViewName;
-        public CheckBox checkBoxComplete;
+    static class TaskViewHolder extends RecyclerView.ViewHolder {
+        TextView titleTextView;
+        TextView dateTextView;
+        TextView timeTextView;
+        CheckBox checkBox;
 
         public TaskViewHolder(@NonNull View itemView) {
             super(itemView);
-            textViewTitle = itemView.findViewById(R.id.textViewTaskTitle);
-            textViewDateTime = itemView.findViewById(R.id.textViewTaskDateTime);
-            textViewName = itemView.findViewById(R.id.textViewTaskName);
-            checkBoxComplete = itemView.findViewById(R.id.checkBoxTaskComplete);
+            titleTextView = itemView.findViewById(R.id.titleTextView);
+            dateTextView = itemView.findViewById(R.id.dateTextView);
+            timeTextView = itemView.findViewById(R.id.timeTextView);
+            checkBox = itemView.findViewById(R.id.taskCheckBox);
         }
     }
 }

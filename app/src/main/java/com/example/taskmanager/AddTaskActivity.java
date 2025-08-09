@@ -1,213 +1,132 @@
-package com.example.taskmanager; // Make sure this matches your package name
+package com.example.taskmanager;
 
+import androidx.appcompat.app.AppCompatActivity;
 import android.app.DatePickerDialog;
 import android.app.TimePickerDialog;
-import android.os.AsyncTask; // Import for AsyncTask
+import android.content.Intent;
 import android.os.Bundle;
-import android.view.MenuItem;
-import android.view.View;
+import android.os.Handler;
+import android.os.Looper;
+import android.text.TextUtils;
 import android.widget.Button;
 import android.widget.DatePicker;
+import android.widget.EditText;
 import android.widget.TimePicker;
 import android.widget.Toast;
 
-import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 
-import com.google.android.material.textfield.TextInputEditText;
-
-import java.lang.ref.WeakReference; // Import for WeakReference
 import java.util.Calendar;
-import java.util.Locale;
+import java.util.Date;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class AddTaskActivity extends AppCompatActivity {
 
-    private TextInputEditText editTextTaskTitle;
-    private TextInputEditText editTextDate;
-    private TextInputEditText editTextTime;
-    private TextInputEditText editTextName;
-    private TextInputEditText editTextDescription;
-    private Button buttonSaveTask;
+    private EditText editTextTitle, editTextDescription;
+    private Button buttonSelectDate, buttonSelectTime, buttonSaveTask;
 
-    private Calendar calendar; // To store the selected date and time
-
-    private TaskDatabase taskDatabase; // Database instance
+    private Calendar taskCalendar;
+    private TaskDatabase taskDatabase;
+    private ExecutorService executorService;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_add_task);
 
-        // --- Toolbar Setup ---
-        Toolbar toolbar = findViewById(R.id.toolbarAddTask);
-        setSupportActionBar(toolbar); // Set the toolbar as the app's action bar
+        // --- Refactored: Initializing ExecutorService for background tasks ---
+        executorService = Executors.newSingleThreadExecutor();
 
-        // Enable the Up button (back button)
+        // --- Toolbar Setup ---
+        Toolbar toolbar = findViewById(R.id.toolbar);
+        setSupportActionBar(toolbar);
         if (getSupportActionBar() != null) {
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
-            getSupportActionBar().setDisplayShowHomeEnabled(true);
-            getSupportActionBar().setTitle("Add New Task"); // Set title for the toolbar
+            getSupportActionBar().setTitle("Add New Task");
         }
+        // Set back button functionality
+        toolbar.setNavigationOnClickListener(v -> onBackPressed());
 
-        // --- Initialize UI Elements ---
-        editTextTaskTitle = findViewById(R.id.editTextTaskTitle);
-        editTextDate = findViewById(R.id.editTextDate);
-        editTextTime = findViewById(R.id.editTextTime);
-        editTextName = findViewById(R.id.editTextName);
-        editTextDescription = findViewById(R.id.editTextDescription);
+        editTextTitle = findViewById(R.id.editTextTaskTitle);
+        editTextDescription = findViewById(R.id.editTextTaskDescription);
+        buttonSelectDate = findViewById(R.id.buttonSelectDate);
+        buttonSelectTime = findViewById(R.id.buttonSelectTime);
         buttonSaveTask = findViewById(R.id.buttonSaveTask);
 
-        calendar = Calendar.getInstance(); // Initialize calendar with current date/time
+        taskCalendar = Calendar.getInstance();
 
-        // Initialize the database instance
+        buttonSelectDate.setOnClickListener(v -> showDatePicker());
+        buttonSelectTime.setOnClickListener(v -> showTimePicker());
+        buttonSaveTask.setOnClickListener(v -> saveTask());
+
         taskDatabase = TaskDatabase.getDatabase(this);
-
-        // --- Date Picker Setup ---
-        editTextDate.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                showDatePicker();
-            }
-        });
-
-        // --- Time Picker Setup ---
-        editTextTime.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                showTimePicker();
-            }
-        });
-
-        // --- Save Task Button Listener ---
-        buttonSaveTask.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                saveTask();
-            }
-        });
     }
 
-    // Handle the Up button (back button) press
-    @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        if (item.getItemId() == android.R.id.home) {
-            onBackPressed(); // Go back to the previous activity
-            return true;
-        }
-        return super.onOptionsItemSelected(item);
-    }
-
-    // Method to show DatePickerDialog
     private void showDatePicker() {
-        DatePickerDialog datePickerDialog = new DatePickerDialog(
-                this,
-                new DatePickerDialog.OnDateSetListener() {
-                    @Override
-                    public void onDateSet(DatePicker view, int year, int monthOfYear, int dayOfMonth) {
-                        calendar.set(Calendar.YEAR, year);
-                        calendar.set(Calendar.MONTH, monthOfYear);
-                        calendar.set(Calendar.DAY_OF_MONTH, dayOfMonth);
-                        updateDateEditText(); // Update the EditText with selected date
-                    }
+        DatePickerDialog datePickerDialog = new DatePickerDialog(this,
+                (view, year, month, dayOfMonth) -> {
+                    taskCalendar.set(Calendar.YEAR, year);
+                    taskCalendar.set(Calendar.MONTH, month);
+                    taskCalendar.set(Calendar.DAY_OF_MONTH, dayOfMonth);
+                    buttonSelectDate.setText(android.text.format.DateFormat.format("MM/dd/yyyy", taskCalendar));
                 },
-                calendar.get(Calendar.YEAR),
-                calendar.get(Calendar.MONTH),
-                calendar.get(Calendar.DAY_OF_MONTH)
-        );
+                taskCalendar.get(Calendar.YEAR),
+                taskCalendar.get(Calendar.MONTH),
+                taskCalendar.get(Calendar.DAY_OF_MONTH));
         datePickerDialog.show();
     }
 
-    // Method to update the date EditText
-    private void updateDateEditText() {
-        String dateFormat = "dd/MM/yyyy"; // Define your desired date format
-        java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat(dateFormat, Locale.getDefault());
-        editTextDate.setText(sdf.format(calendar.getTime()));
-    }
-
-    // Method to show TimePickerDialog
     private void showTimePicker() {
-        TimePickerDialog timePickerDialog = new TimePickerDialog(
-                this,
-                new TimePickerDialog.OnTimeSetListener() {
-                    @Override
-                    public void onTimeSet(TimePicker view, int hourOfDay, int minute) {
-                        calendar.set(Calendar.HOUR_OF_DAY, hourOfDay);
-                        calendar.set(Calendar.MINUTE, minute);
-                        updateTimeEditText(); // Update the EditText with selected time
-                    }
+        TimePickerDialog timePickerDialog = new TimePickerDialog(this,
+                (view, hourOfDay, minute) -> {
+                    taskCalendar.set(Calendar.HOUR_OF_DAY, hourOfDay);
+                    taskCalendar.set(Calendar.MINUTE, minute);
+                    buttonSelectTime.setText(android.text.format.DateFormat.format("hh:mm a", taskCalendar));
                 },
-                calendar.get(Calendar.HOUR_OF_DAY),
-                calendar.get(Calendar.MINUTE),
-                false // Set to true for 24-hour format, false for 12-hour format
-        );
+                taskCalendar.get(Calendar.HOUR_OF_DAY),
+                taskCalendar.get(Calendar.MINUTE),
+                false);
         timePickerDialog.show();
     }
 
-    // Method to update the time EditText
-    private void updateTimeEditText() {
-        String timeFormat = "hh:mm a"; // Define your desired time format (e.g., 03:30 PM)
-        java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat(timeFormat, Locale.getDefault());
-        editTextTime.setText(sdf.format(calendar.getTime()));
-    }
-
-    // Method to handle saving the task
+    // Refactored saveTask method with validation
     private void saveTask() {
-        String title = editTextTaskTitle.getText().toString().trim();
-        String date = editTextDate.getText().toString().trim();
-        String time = editTextTime.getText().toString().trim();
-        String name = editTextName.getText().toString().trim();
+        String title = editTextTitle.getText().toString().trim();
         String description = editTextDescription.getText().toString().trim();
 
-        // Basic validation: Title, Date, and Time are mandatory
-        if (title.isEmpty()) {
-            editTextTaskTitle.setError("Task title is required");
-            editTextTaskTitle.requestFocus();
-            return;
-        }
-        if (date.isEmpty()) {
-            editTextDate.setError("Date is required");
-            editTextDate.requestFocus();
-            return;
-        }
-        if (time.isEmpty()) {
-            editTextTime.setError("Time is required");
-            editTextTime.requestFocus();
+        if (TextUtils.isEmpty(title)) {
+            Toast.makeText(this, "Please enter a task title", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        // Create a new Task object
-        // isCompleted is false by default for new tasks
-        Task newTask = new Task(title, date, time, name, description, false);
+        // New Logic: Check if the selected time is in the past
+        if (taskCalendar.getTimeInMillis() < System.currentTimeMillis()) {
+            Toast.makeText(this, "You cannot create a task for a past time!", Toast.LENGTH_SHORT).show();
+            return;
+        }
 
-        // Insert the task into the database on a background thread
-        new InsertTaskAsyncTask(taskDatabase, new WeakReference<>(this)).execute(newTask);
+        Task task = new Task();
+        task.setTitle(title);
+        task.setDescription(description);
+        task.setCompleted(false);
+        task.setDateTime(taskCalendar.getTime());
+
+        // Use ExecutorService to insert task on a background thread
+        executorService.execute(() -> {
+            taskDatabase.taskDao().insert(task);
+
+            // Return to the main activity on the main thread
+            new Handler(Looper.getMainLooper()).post(() -> {
+                Toast.makeText(this, "Task saved successfully!", Toast.LENGTH_SHORT).show();
+                finish();
+            });
+        });
     }
 
-    // AsyncTask to perform database insertion on a background thread
-    private static class InsertTaskAsyncTask extends AsyncTask<Task, Void, Void> {
-
-        private WeakReference<AddTaskActivity> activityWeakReference;
-        private TaskDao taskDao;
-
-        InsertTaskAsyncTask(TaskDatabase db, WeakReference<AddTaskActivity> activityRef) {
-            this.taskDao = db.taskDao();
-            this.activityWeakReference = activityRef;
-        }
-
-        @Override
-        protected Void doInBackground(final Task... params) {
-            taskDao.insertTask(params[0]); // Insert the task
-            return null;
-        }
-
-        @Override
-        protected void onPostExecute(Void aVoid) {
-            super.onPostExecute(aVoid);
-            AddTaskActivity activity = activityWeakReference.get();
-            if (activity != null && !activity.isFinishing()) {
-                Toast.makeText(activity, "Task Saved Successfully!", Toast.LENGTH_SHORT).show();
-                activity.finish(); // Go back to the previous activity (MainActivity)
-            }
-        }
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        executorService.shutdown(); // Always shut down the ExecutorService
     }
 }
